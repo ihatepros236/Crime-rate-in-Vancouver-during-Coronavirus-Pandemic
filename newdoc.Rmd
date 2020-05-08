@@ -1,0 +1,211 @@
+---
+title: "Untitled"
+author: "Muhammad Ahmad"
+date: "4/25/2020"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(dpi=600,fig.width=7)
+```
+```{r echo=FALSE, warning=FALSE, messages=FALSE}
+library(tidyverse)
+library(lubridate)
+library(hrbrthemes)
+library(ggthemes)
+library(cowplot)
+library(RColorBrewer)
+setwd("C:/Users/Muhammad/Projects/Coronavirus/Coronavirus")
+crimedata<-read_csv("crimedata_csv_all_years.csv")
+pop_data<-read_csv("vancouver_pop_2003to2020.csv")
+names(crimedata)[2]<-"year"
+crimedata<-full_join(crimedata,pop_data)
+mycrime<-filter(crimedata, year>=2017)
+
+
+mycrime$TYPE[mycrime$TYPE == "Theft of Bicycle"] <- "Other Theft"
+
+```
+ 
+```{r echo=FALSE, warning=FALSE, messages=FALSE}
+#filtering weeks and selecting crime rate
+
+pop_data1<-filter(pop_data, year>=2017)
+mycrime<- mycrime %>%
+  mutate(date = make_date(year, MONTH, DAY))
+mycrime<-mutate(mycrime, week=week(date))
+
+mycrime<-filter(mycrime, TYPE!="Vehicle Collision or Pedestrian Struck (with Fatality)" & TYPE!="Vehicle Collision or Pedestrian Struck (with Injury)" & TYPE!="Homicide" & TYPE!="Mischief")
+
+#Only looking at first 20 weeks
+
+mycrime<-filter(mycrime, week<=17)
+```
+
+```{r echo=FALSE, warning=FALSE, messages=FALSE}
+#creating total incidents and crime rate:
+
+#Grouping to summarize weekly incidents
+
+mycrime1<-group_by(mycrime,year,week) %>%
+  summarise(total_incidents=n())
+mycrime1<-full_join(mycrime1,pop_data1)
+
+
+mycrime1<-mutate(mycrime1, CrimeRate=(total_incidents/population)*10000)
+ggplot(mycrime1,aes(x=week,y=CrimeRate,color=factor(year)))+
+  geom_smooth(se=FALSE)+
+  ggtitle("Weekly Variation of crime rate across years")+theme_economist() + scale_fill_economist()
+ggplot(mycrime1,aes(x=week,y=CrimeRate,color=factor(year)))+
+  geom_line()+
+  ggtitle("Weekly Variation of crime rate across years")+theme_economist() + scale_fill_economist()
+
+
+c1<-group_by(mycrime,year,week) %>%
+  summarise(total_incidents=n())
+
+c1<-full_join(c1,pop_data1)
+c1<-mutate(c1,`Crime rate in 2020`=(total_incidents/population)*10000)
+crime2020<-filter(c1,year>=2020)
+
+
+  c2<-full_join(mycrime,pop_data1)
+   c2<-filter(c2, year<2020)%>%
+ group_by(year,week,population)%>%
+     summarise(`Total incidents`=n())
+   c2<-mutate(c2, CrimeRate=(`Total incidents`/population)*10000)
+c2<-group_by(c2,week)%>%
+  summarise(`Crime rate average in last 3 years`=mean(CrimeRate))
+     
+c2<-full_join(crime2020,c2)
+
+
+c2<-pivot_longer(c2,cols=starts_with("Crime"),names_to ="Crime Period",  values_to ="Crime Rate")
+
+ggplot(c2)+
+  geom_line(aes(x=week,y=`Crime Rate`, color=`Crime Period`))+
+ggtitle("Crime Rate in 2020 vs 3 years average")+theme_economist() + scale_fill_economist()
+
+
+ggplot(c2, aes(x=week, y=`Crime Rate`, fill=`Crime Period`)) + 
+  geom_area()+
+  scale_fill_ipsum() +
+  scale_x_continuous(expand=c(0,0)) +
+  scale_y_comma() +
+  labs(title="Weekly Variation of crime rate across years") +
+  theme_ipsum_rc(grid="XY") +
+  theme(axis.text.x=element_text(hjust=c(0, 0.5, 0.5, 0.5, 1))) +
+  theme(legend.position="bottom")+scale_fill_hue(c=35, l=80)
+
+
+
+``` 
+
+
+
+
+
+
+
+
+
+
+
+```{r echo=FALSE, warning=FALSE, messages=FALSE}
+
+myfunc2<-function(y){
+c1<-group_by(mycrime,year,week,TYPE) %>%
+  filter(TYPE==y)%>%
+  summarise(total_incidents=n())
+
+c1<-full_join(c1,pop_data1)
+c1<-mutate(c1,`Crime rate in 2020`=(total_incidents/population)*10000)
+crime2020<-filter(c1,year>=2020)
+
+
+  c2<-full_join(mycrime,pop_data1)
+   c2<-filter(c2, year<2020,TYPE==y)%>%
+ group_by(year,week,TYPE,population)%>%
+     summarise(`Total incidents`=n())
+   c2<-mutate(c2, CrimeRate=(`Total incidents`/population)*10000)
+c2<-group_by(c2,week,TYPE)%>%
+  summarise(`Crime rate average in last 3 years`=mean(CrimeRate))
+     
+c2<-full_join(crime2020,c2)
+
+
+c2<-pivot_longer(c2,cols=starts_with("Crime"),names_to ="Crime Period",  values_to ="Crime Rate")
+
+
+
+g1<-ggplot(c2)+
+  geom_line(aes(x=week,y=`Crime Rate`, color=`Crime Period`),se=FALSE)+
+ggtitle(y)+theme_economist() + scale_fill_economist()+theme(legend.title = element_blank()) 
+return(g1)
+}
+
+
+myfun1<-function(y){
+c1<-group_by(mycrime,year,week,TYPE) %>%
+  filter(TYPE==y)%>%
+  summarise(total_incidents=n())
+
+c1<-full_join(c1,pop_data1)
+c1<-mutate(c1,`Crime rate`=(total_incidents/population)*10000)
+g1<-ggplot(c1)+
+  geom_line(aes(x=week,y=`Crime rate`, color=as.factor(year)))+
+  ggtitle(y)+theme_economist() + scale_fill_economist()+theme(legend.title = element_blank())
+return(g1)
+}
+
+```
+
+
+```{r echo=FALSE, warning=FALSE, messages=FALSE}
+# geom_line plots for each crime type through the first 16 weeks of the year for the years 2017 through 2020
+
+graph11<-myfun1(y="Break and Enter Commercial")
+graph21<-myfun1(y="Break and Enter Residential/Other")
+graph31<-myfun1(y="Offence Against a Person")
+graph41<-myfun1(y="Other Theft")
+graph51<-myfun1(y="Theft from Vehicle")
+graph61<-myfun1(y="Theft of Vehicle")
+
+```
+```{r  echo=FALSE, warning=FALSE, messages=FALSE}
+
+#geom_line plots for each crime type through the first 16 weeks of the year for the year 2020 compared to the average from 2017, 2018, 2019
+graph12<-myfunc2(y="Break and Enter Commercial")
+graph22<-myfunc2(y="Break and Enter Residential/Other")
+graph32<-myfunc2(y="Offence Against a Person")
+graph42<-myfunc2(y="Other Theft")
+graph52<-myfunc2(y="Theft from Vehicle")
+graph62<-myfunc2(y="Theft of Vehicle")
+
+graph11
+graph12
+
+graph21
+graph22
+
+
+graph31
+graph32
+
+graph31
+graph32
+
+graph41
+graph42
+
+
+graph51
+graph52
+
+graph61
+graph62
+
+
+
+```
